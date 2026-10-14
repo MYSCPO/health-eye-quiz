@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>10월 건강을 길음 - 세계 눈의 날 눈 건강 퀴즈</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script>
+        if (window.tailwind) tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        eyecare: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Pretendard', 'Apple SD Gothic Neo', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React & ReactDOM -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel for JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- html2pdf.js for exporting certificate/ticket -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- canvas-confetti for celebration -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800;900&display=swap');
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background: linear-gradient(135deg, #e0f2fe 0%, #f0fdf4 50%, #e0e7ff 100%);
+            min-height: 100vh;
+            word-break: keep-all;
+            overflow-wrap: break-word;
+        }
+        .card-shadow {
+            box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.12), 0 8px 10px -6px rgba(2, 132, 199, 0.08);
+        }
+        .animate-bounce-gentle {
+            animation: bounceGentle 2s infinite;
+        }
+        @keyframes bounceGentle {
+            0%, 100% { transform: translateY(-3%); }
+            50% { transform: translateY(3%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .animate-bounce-gentle { animation: none; }
+        }
+        /* 원본 인포그래픽: 비율 유지, 잘림·찌그러짐 없음, 필터·장식 없음 */
+        .infographic-original {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            object-fit: contain;
+            margin: 0 auto;
+            filter: none;
+        }
+        /* 키보드 포커스 표시 */
+        a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible {
+            outline: 3px solid #0284c7;
+            outline-offset: 2px;
+        }
+        .sr-only {
+            position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+            overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-sky-500 selection:text-white">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ─────────────────────────────────────────────
+        // 원본 인포그래픽 (제공된 PNG 파일을 그대로 사용)
+        //  - 파일 위치: assets/world-sight-day-infographic.png (index.html 기준 상대 경로)
+        //  - 다운로드 파일명: 세계눈의날_눈건강_6가지약속.png
+        // ─────────────────────────────────────────────
+        const INFOGRAPHIC_SRC = 'assets/world-sight-day-infographic.png';
+        const INFOGRAPHIC_DOWNLOAD_NAME = '세계눈의날_눈건강_6가지약속.png';
+        const INFOGRAPHIC_WIDTH = 1024;   // 원본 픽셀 크기 (비율 유지용)
+        const INFOGRAPHIC_HEIGHT = 1536;
+        const INFOGRAPHIC_ALT = "세계 눈의 날 눈 건강 인포그래픽. 10월 8일 세계 눈의 날 안내와 '눈 건강을 위한 6가지 약속'이 담겨 있습니다. 1 바른 자세로 보기(화면과 눈의 거리 30~50cm 유지), 2 적절한 조명, 3 눈의 휴식(20분마다 20초 동안 약 6m 먼 곳 바라보기), 4 영양 듬뿍 섭취(비타민A, 루테인, 오메가3), 5 눈에 좋은 생활습관(충분한 수면과 규칙적인 생활), 6 정기적인 검진.";
+
+        // Claude 미리보기 화면에서는 일반 다운로드가 막혀 있으므로, 미리보기가 제공하는
+        // 저장 기능을 사용 (일반 웹사이트에서는 window.claude가 없어 기존 방식으로 동작)
+        const viewerDownloadsPromise = (window.claude && typeof window.claude.use === 'function')
+            ? window.claude.use('downloads').catch(() => null)
+            : Promise.resolve(null);
+
+        // 브라우저 탭 단위 임시 저장 (서버 저장 아님)
+        const STORAGE_KEY = 'eyeday-quiz-session-v2';
+        const loadSession = () => {
+            try {
+                const raw = window.sessionStorage.getItem(STORAGE_KEY);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) { return null; }
+        };
+        const saveSession = (data) => {
+            try { window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch (e) { /* 저장 불가 환경은 무시 */ }
+        };
+
+        // Sound Engine using Web Audio API
+        const playAudio = (type) => {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                if (type === 'correct') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+                    osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1); // E5
+                    osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2); // G5
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.45);
+                } else if (type === 'wrong') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(220, ctx.currentTime); // A3
+                    osc.frequency.setValueAtTime(164.81, ctx.currentTime + 0.15); // E3
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.35);
+                } else if (type === 'fanfare') {
+                    [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.connect(g);
+                        g.connect(ctx.destination);
+                        o.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
+                        g.gain.setValueAtTime(0.15, ctx.currentTime + idx * 0.12);
+                        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.12 + 0.3);
+                        o.start(ctx.currentTime + idx * 0.12);
+                        o.stop(ctx.currentTime + idx * 0.12 + 0.3);
+                    });
+                }
+            } catch (e) {
+                console.log('Audio playback not supported or user interacted yet.');
+            }
+        };
+
+        // Quiz Data (기존 문항·정답·해설 그대로 유지)
+        const QUIZ_QUESTIONS = [
+            {
+                id: 1,
+                type: 'OX',
+                badge: 'OX 퀴즈',
+                title: "눈의 휴식을 위한 '20-20-20 규칙'",
+                question: "20분 동안 스마트폰이나 화면을 본 후에는 20초 동안 약 6m(20ft) 떨어진 먼 곳을 바라보는 것이 눈 휴식에 좋다!",
+                options: [
+                    { label: 'O (맞다)', value: 'O', isCorrect: true },
+                    { label: 'X (틀리다)', value: 'X', isCorrect: false }
+                ],
+                explanation: "정답은 O 입니다! 화면을 보느라 지친 눈의 피로를 풀어주기 위해 20분마다 6m 떨어진 먼 곳을 20초간 바라보는 습관이 매우 중요합니다."
+            },
+            {
+                id: 2,
+                type: 'CHOICE',
+                badge: '4지 선다형',
+                title: '올바른 화면 시청 거리',
+                question: '컴퓨터나 스마트폰 화면과 눈 사이의 올바른 적정 거리는 얼마일까요?',
+                options: [
+                    { label: '10 ~ 20 cm', value: '1', isCorrect: false },
+                    { label: '30 ~ 50 cm', value: '2', isCorrect: true },
+                    { label: '80 ~ 100 cm', value: '3', isCorrect: false },
+                    { label: '거리는 전혀 상관없다', value: '4', isCorrect: false }
+                ],
+                explanation: "정답은 '30~50cm' 입니다! 화면과 눈 사이의 거리는 최소 30~50cm를 유지해야 눈 근육의 과도한 조절 긴장을 줄일 수 있습니다."
+            },
+            {
+                id: 3,
+                type: 'CHOICE',
+                badge: '4지 선다형',
+                title: '눈 건강에 좋은 영양소',
+                question: '인포그래픽에서 소개한 눈 건강에 좋은 대표 영양소가 아닌 것은 무엇일까요?',
+                options: [
+                    { label: '비타민 A', value: '1', isCorrect: false },
+                    { label: '루테인', value: '2', isCorrect: false },
+                    { label: '오메가 3', value: '3', isCorrect: false },
+                    { label: '탄산음료', value: '4', isCorrect: true }
+                ],
+                explanation: "정답은 '탄산음료' 입니다! 당근, 생선, 블루베리 등에 풍부한 비타민 A, 루테인, 오메가 3는 눈 건강 필수 영양소이지만, 설탕이 많은 탄산음료는 눈 건강에 도움이 되지 않습니다."
+            },
+            {
+                id: 4,
+                type: 'OX',
+                badge: 'OX 퀴즈',
+                title: '세계 눈의 날 기념일',
+                question: "'세계 눈의 날'은 실명 예방과 시력 장애에 대한 관심 높이기를 위해 매년 10월 둘째 주 목요일로 지정되어 있다.",
+                options: [
+                    { label: 'O (맞다)', value: 'O', isCorrect: true },
+                    { label: 'X (틀리다)', value: 'X', isCorrect: false }
+                ],
+                explanation: "정답은 O 입니다! 1999년 WHO와 IAPB가 지정한 '세계 눈의 날(World Sight Day)'은 매년 10월 둘째 주 목요일(올해 10월 8일)입니다."
+            }
+        ];
+
+        // 진행 단계 표시
+        const STEPS = [
+            { key: 'intro', label: '참가자 정보', short: '정보' },
+            { key: 'mission', label: '인포그래픽 확인', short: '인포그래픽' },
+            { key: 'quiz', label: '눈 건강 퀴즈', short: '퀴즈' },
+            { key: 'result', label: '결과 확인', short: '결과' },
+        ];
+        const stepIndexOf = (view) => {
+            if (view === 'infographic') return 3; // 결과 화면에서 다시 보는 인포그래픽
+            const i = STEPS.findIndex(s => s.key === view);
+            return i < 0 ? 0 : i;
+        };
+
+        function StepIndicator({ view }) {
+            const current = stepIndexOf(view);
+            return (
+                <nav aria-label="참여 진행 단계" className="mb-4">
+                    <ol className="flex items-start justify-between gap-1 bg-white/70 backdrop-blur rounded-2xl px-2 sm:px-4 py-3 border border-sky-100">
+                        {STEPS.map((step, idx) => {
+                            const done = idx < current;
+                            const active = idx === current;
+                            const circle = done
+                                ? 'bg-teal-500 text-white border-teal-500'
+                                : active
+                                    ? 'bg-sky-600 text-white border-sky-600 ring-4 ring-sky-200'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200';
+                            const text = done ? 'text-teal-700' : active ? 'text-sky-700 font-black' : 'text-slate-400';
+                            return (
+                                <li key={step.key} className="flex-1 flex flex-col items-center text-center min-w-0"
+                                    aria-current={active ? 'step' : undefined}>
+                                    <span className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border-2 flex items-center justify-center text-sm font-black ${circle}`} aria-hidden="true">
+                                        {done ? <i className="fa-solid fa-check"></i> : idx + 1}
+                                    </span>
+                                    <span className={`mt-1 text-[11px] sm:text-xs font-bold leading-tight ${text}`}>
+                                        <span className="sm:hidden">{step.short}</span>
+                                        <span className="hidden sm:inline">{step.label}</span>
+                                    </span>
+                                    <span className="sr-only">
+                                        {done ? ' (완료)' : active ? ' (현재 단계)' : ' (진행 전)'}
+                                    </span>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                </nav>
+            );
+        }
+
+        function App() {
+            const saved = useRef(loadSession()).current || {};
+
+            // 'intro' | 'mission'(인포그래픽 확인·인증) | 'quiz' | 'result' | 'infographic'(결과 후 다시 보기)
+            const [view, setView] = useState(() => {
+                // 새로고침 시 복원: 결과가 있으면 결과, 인증 완료/진행 중이면 인포그래픽 단계, 아니면 처음
+                if (saved.result) return 'result';
+                if (saved.participant) return 'mission';
+                return 'intro';
+            });
+            const [studentName, setStudentName] = useState(saved.participant?.name || '');
+            const [studentId, setStudentId] = useState(saved.participant?.studentId || '');
+            // 현재 참가자 (정보 입력을 완료한 사람)와 인포그래픽 인증 상태
+            const [participant, setParticipant] = useState(saved.participant || null);
+            // participant.infographicStatus: 'pending'(확인 전) | 'confirmed'(확인 완료)
+            const [downloadRequested, setDownloadRequested] = useState(!!saved.participant?.downloadRequested);
+            const [downloadNotice, setDownloadNotice] = useState('');
+            const [downloadMode, setDownloadMode] = useState('download'); // 'download' | 'opened'(새 탭으로 열림)
+
+            const [currentQIndex, setCurrentQIndex] = useState(0);
+            const [selectedOption, setSelectedOption] = useState(null);
+            const [isSubmitted, setIsSubmitted] = useState(false);
+            const [userAnswers, setUserAnswers] = useState(saved.result?.userAnswers || []);
+            const [score, setScore] = useState(saved.result?.score || 0);
+            const [snackClaimed, setSnackClaimed] = useState(!!saved.result?.snackClaimed);
+            const [quizFinished, setQuizFinished] = useState(!!saved.result);
+            const [nameError, setNameError] = useState('');
+            const [idError, setIdError] = useState('');
+            const [answerError, setAnswerError] = useState('');
+
+            const isConfirmed = participant?.infographicStatus === 'confirmed';
+            const headingRef = useRef(null);
+            const firstRender = useRef(true);
+
+            // 최신 상태를 popstate 핸들러에서 쓰기 위한 ref
+            const stateRef = useRef({});
+            stateRef.current = { participant, isConfirmed, quizFinished };
+
+            // ── 화면 이동 가드: 인증 전에는 어떤 경로로도 퀴즈에 들어갈 수 없음 ──
+            const resolveView = (target) => {
+                const s = stateRef.current;
+                if (target === 'intro') return 'intro';
+                if (!s.participant) return 'intro';
+                if (target === 'quiz') {
+                    if (!s.isConfirmed) return 'mission';
+                    if (s.quizFinished) return 'result';
+                    return 'quiz';
+                }
+                if ((target === 'result' || target === 'infographic') && !s.quizFinished) {
+                    return s.isConfirmed ? 'quiz' : 'mission';
+                }
+                return target;
+            };
+
+            const navigate = (target, { replace = false } = {}) => {
+                const next = resolveView(target);
+                try {
+                    if (replace) window.history.replaceState({ view: next }, '');
+                    else window.history.pushState({ view: next }, '');
+                } catch (e) { /* history 사용 불가 환경 */ }
+                setView(next);
+            };
+
+            // 브라우저 뒤로/앞으로 가기 처리
+            useEffect(() => {
+                try { window.history.replaceState({ view }, ''); } catch (e) {}
+                const onPop = (e) => {
+                    const target = e.state && e.state.view ? e.state.view : 'intro';
+                    const next = resolveView(target);
+                    if (next !== target) {
+                        try { window.history.replaceState({ view: next }, ''); } catch (err) {}
+                    }
+                    setView(next);
+                };
+                window.addEventListener('popstate', onPop);
+                return () => window.removeEventListener('popstate', onPop);
+                // eslint-disable-next-line react-hooks/exhaustive-deps
+            }, []);
+
+            // 화면 전환 시 맨 위로 + 제목으로 포커스 이동 (보조 기술 사용자 안내)
+            useEffect(() => {
+                if (firstRender.current) { firstRender.current = false; return; }
+                window.scrollTo(0, 0);
+                if (headingRef.current) headingRef.current.focus({ preventScroll: true });
+            }, [view]);
+
+            // 탭 단위 임시 저장 (새로고침 대비)
+            useEffect(() => {
+                saveSession({
+                    participant: participant ? { ...participant, downloadRequested } : null,
+                    result: quizFinished ? { score, userAnswers, snackClaimed } : null,
+                });
+            }, [participant, downloadRequested, quizFinished, score, userAnswers, snackClaimed]);
+
+            // Trigger confetti on perfect score or finish
+            useEffect(() => {
+                if (view === 'result') {
+                    playAudio('fanfare');
+                    if (window.confetti) {
+                        window.confetti({
+                            particleCount: 80,
+                            spread: 70,
+                            origin: { y: 0.6 }
+                        });
+                    }
+                }
+            }, [view]);
+
+            // STEP 1 → STEP 2: 참가자 정보 입력 후 인포그래픽 확인 화면으로 이동
+            const handleSubmitParticipant = (e) => {
+                e.preventDefault();
+                const name = studentName.trim();
+                const sid = studentId.trim();
+                if (!sid) {
+                    setIdError('학번을 입력해 주세요!');
+                    const el = document.getElementById('studentId');
+                    if (el) el.focus();
+                    return;
+                }
+                setIdError('');
+                if (!name) {
+                    setNameError('이름을 입력해 주세요!');
+                    const el = document.getElementById('studentName');
+                    if (el) el.focus();
+                    return;
+                }
+                setNameError('');
+                const sameParticipant = participant && participant.name === name && participant.studentId === sid;
+                if (!sameParticipant) {
+                    // 새 참가자: 인증 상태와 결과를 초기화
+                    const fresh = { name, studentId: sid, infographicStatus: 'pending', confirmedAt: null };
+                    setParticipant(fresh);
+                    setDownloadRequested(false);
+                    setUserAnswers([]);
+                    setScore(0);
+                    setSnackClaimed(false);
+                    setQuizFinished(false);
+                    stateRef.current = { participant: fresh, isConfirmed: false, quizFinished: false };
+                }
+                setStudentName(name);
+                navigate('mission');
+            };
+
+            // STEP 3: 원본 PNG 다운로드 (재압축·변환 없이 원본 바이트 그대로)
+            const handleDownload = async (e) => {
+                e.preventDefault();
+                const triggerDownload = (href) => {
+                    const a = document.createElement('a');
+                    a.href = href;
+                    a.download = INFOGRAPHIC_DOWNLOAD_NAME;
+                    a.rel = 'noopener';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                };
+                setDownloadNotice('');
+                const viewerDownloads = await viewerDownloadsPromise;
+                if (viewerDownloads) {
+                    try {
+                        const res = await fetch(INFOGRAPHIC_SRC);
+                        if (!res.ok) throw new Error('fetch failed');
+                        const blob = await res.blob(); // 원본 바이트 그대로
+                        await viewerDownloads.save({ filename: INFOGRAPHIC_DOWNLOAD_NAME, data: blob });
+                        setDownloadMode('download');
+                        setDownloadRequested(true);
+                    } catch (err) {
+                        if (err && err.code === 'declined') {
+                            setDownloadNotice('다운로드를 취소했어요. 다시 누르면 저장할 수 있어요.');
+                        } else if (err && err.code === 'rate_limited') {
+                            setDownloadNotice('저장 확인 창이 이미 열려 있어요. 잠시 후 다시 눌러 주세요.');
+                        } else {
+                            setDownloadNotice('이 화면에서는 파일을 저장할 수 없어요. "새 탭에서 크게 보기"로 열어 저장해 주세요.');
+                            setDownloadRequested(true);
+                            setDownloadMode('opened');
+                        }
+                    }
+                    return;
+                }
+                try {
+                    // 원본 파일을 그대로 받아(Blob) 지정한 파일명으로 저장 → 바이트 변경 없음
+                    const res = await fetch(INFOGRAPHIC_SRC, { cache: 'no-store' });
+                    if (!res.ok) throw new Error('fetch failed');
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    triggerDownload(url);
+                    setTimeout(() => URL.revokeObjectURL(url), 10000);
+                    setDownloadMode('download');
+                } catch (err) {
+                    if (window.location.protocol === 'file:') {
+                        // HTML 파일을 직접 열었을 때(file://)는 브라우저가 download 속성을 무시하므로
+                        // 앱 화면을 벗어나지 않도록 원본 이미지를 새 탭으로 열어 저장하도록 안내
+                        window.open(INFOGRAPHIC_SRC, '_blank', 'noopener');
+                        setDownloadMode('opened');
+                    } else {
+                        // 그 밖의 환경: 원본 파일 링크로 직접 다운로드
+                        triggerDownload(INFOGRAPHIC_SRC);
+                        setDownloadMode('download');
+                    }
+                }
+                // 다운로드 "요청"이 실행되었다는 의미 (실제 저장 완료를 보장하지 않음)
+                setDownloadRequested(true);
+            };
+
+            // STEP 4: 학생의 확인 응답에 기반한 인증 (여러 번 눌러도 안전)
+            const handleConfirmInfographic = () => {
+                if (!participant) return;
+                if (participant.infographicStatus === 'confirmed') return;
+                const updated = { ...participant, infographicStatus: 'confirmed', confirmedAt: new Date().toISOString() };
+                setParticipant(updated);
+                stateRef.current = { ...stateRef.current, participant: updated, isConfirmed: true };
+            };
+
+            // STEP 5: 인증 완료 학생만 퀴즈 시작 (기존 퀴즈 초기화 로직 그대로)
+            const handleStartQuiz = () => {
+                if (!isConfirmed) return;
+                setCurrentQIndex(0);
+                setSelectedOption(null);
+                setIsSubmitted(false);
+                setUserAnswers([]);
+                setScore(0);
+                setSnackClaimed(false);
+                setQuizFinished(false);
+                stateRef.current = { ...stateRef.current, quizFinished: false };
+                navigate('quiz');
+            };
+
+            const handleSelectOption = (opt) => {
+                if (isSubmitted) return;
+                setAnswerError('');
+                setSelectedOption(opt);
+            };
+
+            const handleSubmitAnswer = () => {
+                if (!selectedOption) {
+                    setAnswerError('답안을 선택해 주세요!');
+                    return;
+                }
+                setAnswerError('');
+
+                const currentQuestion = QUIZ_QUESTIONS[currentQIndex];
+                const correct = selectedOption.isCorrect;
+
+                if (correct) {
+                    playAudio('correct');
+                    setScore(prev => prev + 25);
+                } else {
+                    playAudio('wrong');
+                }
+
+                setIsSubmitted(true);
+                setUserAnswers(prev => [...prev, {
+                    questionId: currentQuestion.id,
+                    selected: selectedOption.label,
+                    isCorrect: correct,
+                    explanation: currentQuestion.explanation
+                }]);
+            };
+
+            const handleNextQuestion = () => {
+                if (currentQIndex + 1 < QUIZ_QUESTIONS.length) {
+                    setCurrentQIndex(prev => prev + 1);
+                    setSelectedOption(null);
+                    setIsSubmitted(false);
+                } else {
+                    setQuizFinished(true);
+                    stateRef.current = { ...stateRef.current, quizFinished: true };
+                    // 결과 화면에서 뒤로 가기로 퀴즈에 재진입하지 않도록 기록을 교체
+                    navigate('result', { replace: true });
+                }
+            };
+
+            const downloadSnackTicket = () => {
+                const element = document.getElementById('snack-pass-card');
+                const opt = {
+                    margin: 0.3,
+                    filename: `${studentId}_${studentName}_눈건강실천리더_간식교환권.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2 },
+                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                };
+                if (window.html2pdf) {
+                    viewerDownloadsPromise.then((viewerDownloads) => {
+                        if (viewerDownloads) {
+                            window.html2pdf().set(opt).from(element).outputPdf('blob')
+                                .then((blob) => viewerDownloads.save({ filename: opt.filename, data: blob }))
+                                .catch(() => {});
+                        } else {
+                            window.html2pdf().set(opt).from(element).save();
+                        }
+                    });
+                } else {
+                    window.print();
+                }
+            };
+
+            // 원본 인포그래픽 표시 (공통)
+            const InfographicFigure = () => (
+                <figure className="bg-gradient-to-b from-sky-50 to-teal-50 rounded-2xl p-1.5 sm:p-6 border border-sky-100">
+                    <div className="mx-auto w-full max-w-[640px] bg-white rounded-xl overflow-visible">
+                        <img
+                            src={INFOGRAPHIC_SRC}
+                            width={INFOGRAPHIC_WIDTH}
+                            height={INFOGRAPHIC_HEIGHT}
+                            alt={INFOGRAPHIC_ALT}
+                            className="infographic-original"
+                            decoding="async"
+                        />
+                    </div>
+                    <figcaption className="mt-3 text-center">
+                        <a href={INFOGRAPHIC_SRC} target="_blank" rel="noopener"
+                           className="inline-flex items-center gap-1.5 text-sm font-bold text-sky-700 underline underline-offset-2 py-2 px-2">
+                            <i className="fa-solid fa-magnifying-glass-plus" aria-hidden="true"></i>
+                            <span>인포그래픽 원본을 새 탭에서 크게 보기</span>
+                        </a>
+                    </figcaption>
+                </figure>
+            );
+
+            const wideView = view === 'mission' || view === 'infographic';
+
+            return (
+                <div className={`${wideView ? 'max-w-md sm:max-w-2xl lg:max-w-3xl' : 'max-w-md sm:max-w-xl'} mx-auto px-4 py-6 min-h-screen flex flex-col justify-between`}>
+
+                    {/* APP HEADER */}
+                    <header className="text-center pb-4 mb-2">
+                        <div className="inline-flex items-center space-x-2 bg-sky-600 text-white px-3.5 py-1 rounded-full text-xs font-extrabold tracking-wide shadow-md shadow-sky-500/20 mb-2">
+                            <i className="fa-solid fa-eye text-amber-300" aria-hidden="true"></i>
+                            <span>10월 '건강을 길음' 보건행사</span>
+                        </div>
+                        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                            세계 눈의 날 <span className="text-sky-600">눈 건강 퀴즈</span>
+                        </h1>
+                        <p className="text-xs sm:text-sm text-slate-600 mt-1 font-medium">
+                            매년 10월 둘째 주 목요일은 눈 건강을 지키는 날! 퀴즈 맞추고 보건실 간식 받자!
+                        </p>
+                    </header>
+
+                    <StepIndicator view={view} />
+
+                    <main className="my-auto">
+
+                    {/* VIEW 1: INTRO / STUDENT INPUT */}
+                    {view === 'intro' && (
+                        <div className="bg-white rounded-3xl p-6 sm:p-8 card-shadow border border-sky-100 space-y-6">
+                            <div className="text-center space-y-3">
+                                <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-sky-400 to-teal-400 flex items-center justify-center text-white text-3xl shadow-xl shadow-sky-400/30 animate-bounce-gentle" aria-hidden="true">
+                                    <i className="fa-solid fa-glasses"></i>
+                                </div>
+                                <h2 ref={headingRef} tabIndex={-1} className="text-xl font-extrabold text-slate-900 focus:outline-none">퀴즈 참가자 정보 입력</h2>
+                                <p className="text-sm text-slate-500 leading-relaxed">
+                                    눈 건강 인포그래픽을 확인한 뒤 총 4개 문항을 모두 풀면 <strong className="text-sky-600 font-bold">'눈 건강 실천리더'</strong> 상장과 함께 점심시간 보건실 간식 교환권이 발급됩니다.
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleSubmitParticipant} className="space-y-4 pt-2">
+                                <div>
+                                    <label htmlFor="studentId" className="block text-xs font-bold text-slate-700 mb-1">학번</label>
+                                    <input
+                                        id="studentId"
+                                        type="text"
+                                        inputMode="numeric"
+                                        autoComplete="off"
+                                        maxLength={10}
+                                        placeholder="학번을 입력하세요 (예: 10101)"
+                                        value={studentId}
+                                        onChange={(e) => { setStudentId(e.target.value.replace(/[^0-9]/g, '')); if (idError) setIdError(''); }}
+                                        aria-invalid={!!idError}
+                                        aria-describedby={idError ? 'id-error' : 'id-help'}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                                    />
+                                    {idError ? (
+                                        <p id="id-error" role="alert" className="mt-1.5 text-sm font-bold text-rose-600">{idError}</p>
+                                    ) : (
+                                        <p id="id-help" className="mt-1 text-xs text-slate-500">숫자만 입력해 주세요.</p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label htmlFor="studentName" className="block text-xs font-bold text-slate-700 mb-1">이름</label>
+                                    <input
+                                        id="studentName"
+                                        type="text"
+                                        autoComplete="off"
+                                        placeholder="이름을 입력하세요 (예: 홍길동)"
+                                        value={studentName}
+                                        onChange={(e) => { setStudentName(e.target.value); if (nameError) setNameError(''); }}
+                                        aria-invalid={!!nameError}
+                                        aria-describedby={nameError ? 'name-error' : undefined}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                                    />
+                                    {nameError && (
+                                        <p id="name-error" role="alert" className="mt-1.5 text-sm font-bold text-rose-600">{nameError}</p>
+                                    )}
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="w-full py-4 rounded-xl font-black text-white bg-gradient-to-r from-sky-500 via-teal-500 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 shadow-lg shadow-sky-500/25 transition transform active:scale-95 flex items-center justify-center space-x-2 text-base mt-4">
+                                    <span>다음 단계: 인포그래픽 확인하기</span>
+                                    <i className="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                                </button>
+                            </form>
+                        </div>
+                    )}
+
+                    {/* VIEW 2: INFOGRAPHIC MISSION (확인 · 다운로드 · 인증) */}
+                    {view === 'mission' && participant && (
+                        <div className="bg-white rounded-3xl px-3 py-5 sm:p-8 card-shadow border border-sky-100 space-y-6">
+                            <div className="text-center space-y-2">
+                                <h2 ref={headingRef} tabIndex={-1} className="text-xl sm:text-2xl font-black text-slate-900 focus:outline-none">
+                                    STEP 1. 눈 건강 인포그래픽 확인하기
+                                </h2>
+                                <p className="text-base sm:text-lg font-extrabold text-sky-700">
+                                    눈 건강 실천리더가 되기 위한 첫 번째 미션!
+                                </p>
+                                <p className="text-sm text-slate-600 leading-relaxed">
+                                    눈 건강을 지키는 6가지 약속을 확인해 보세요.<br />
+                                    인포그래픽을 확인한 뒤 다음 단계로 이동해 주세요. (다운로드는 선택이에요)
+                                </p>
+                                <p className="text-xs text-slate-500 font-bold pt-1">
+                                    참가자: <span className="text-slate-800">학번 {participant.studentId} · {participant.name}</span>
+                                    <button type="button" onClick={() => navigate('intro')}
+                                        className="ml-2 text-sky-700 underline underline-offset-2 py-1">정보 수정</button>
+                                </p>
+                            </div>
+
+                            {InfographicFigure()}
+
+                            <div className="rounded-2xl bg-sky-50 border border-sky-100 p-4 text-sm text-sky-900 leading-relaxed">
+                                <p className="font-extrabold flex items-center gap-1.5 text-sky-800">
+                                    <i className="fa-solid fa-circle-info" aria-hidden="true"></i>
+                                    <span>왜 확인해야 하나요?</span>
+                                </p>
+                                <p className="mt-1">
+                                    이어지는 눈 건강 퀴즈 4문제는 이 인포그래픽의 내용에서 나와요.
+                                    다운로드해 두면 퀴즈가 끝난 뒤에도 언제든 다시 보며 눈 건강 약속을 실천할 수 있어요.
+                                </p>
+                            </div>
+
+                            {/* STEP 3: 다운로드 (선택) */}
+                            <div className="space-y-2">
+                                <a
+                                    href={INFOGRAPHIC_SRC}
+                                    download={INFOGRAPHIC_DOWNLOAD_NAME}
+                                    onClick={handleDownload}
+                                    role="button"
+                                    aria-label={`눈 건강 인포그래픽 PNG 파일 다운로드 (파일명: ${INFOGRAPHIC_DOWNLOAD_NAME})`}
+                                    className="w-full min-h-[54px] rounded-2xl font-black text-white bg-sky-700 hover:bg-sky-800 active:bg-sky-900 transition flex items-center justify-center gap-2 text-base px-4 text-center">
+                                    <span aria-hidden="true">📥</span>
+                                    <span>눈 건강 인포그래픽 다운로드 (선택)</span>
+                                </a>
+                                <p className="text-xs text-slate-500 text-center">
+                                    원하면 내 기기에 저장해 둘 수 있어요 · PNG 이미지 · {INFOGRAPHIC_DOWNLOAD_NAME}
+                                </p>
+                                <div aria-live="polite" className="min-h-[1.5rem] space-y-2">
+                                    {downloadNotice && (
+                                        <p className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm font-bold text-amber-900">{downloadNotice}</p>
+                                    )}
+                                    {downloadRequested && (
+                                        <div className="rounded-xl bg-teal-50 border border-teal-200 px-4 py-3 text-sm text-teal-900">
+                                            <p className="font-bold flex items-center gap-1.5">
+                                                <i className="fa-solid fa-download" aria-hidden="true"></i>
+                                                <span>인포그래픽 다운로드를 진행했어요.</span>
+                                            </p>
+                                            <p className="mt-1 text-xs text-teal-800">
+                                                {downloadMode === 'opened'
+                                                    ? '새 탭에 원본 이미지가 열렸어요. 이미지를 길게 누르거나 마우스 오른쪽 버튼으로 "이미지 저장"을 선택해 저장해 주세요.'
+                                                    : '기기의 다운로드 폴더나 사진 앱에서 파일을 확인해 보세요. 저장되지 않았다면 버튼을 한 번 더 눌러 주세요.'}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* STEP 4: 확인 인증 */}
+                            <section aria-labelledby="confirm-title" className="rounded-2xl border-2 border-dashed border-teal-300 bg-teal-50/50 p-4 sm:p-5 space-y-3">
+                                <h3 id="confirm-title" className="text-base sm:text-lg font-black text-slate-900">
+                                    👀 눈 건강 약속을 확인했나요?
+                                </h3>
+                                <p className="text-sm text-slate-600 leading-relaxed">
+                                    인포그래픽을 확인하고 눈 건강을 위한 6가지 약속을
+                                    읽었다면 아래 버튼을 눌러 주세요.
+                                </p>
+
+                                {!isConfirmed ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={handleConfirmInfographic}
+                                            className="w-full min-h-[52px] rounded-2xl font-black text-base border-2 transition flex items-center justify-center gap-2 bg-white text-teal-700 border-teal-500 hover:bg-teal-50">
+                                            <span>인포그래픽 확인 완료 ✓</span>
+                                        </button>
+                                    </>
+                                ) : (
+                                    <div role="status" className="rounded-xl bg-teal-500 text-white px-4 py-3 font-bold text-sm flex items-center gap-2">
+                                        <i className="fa-solid fa-circle-check text-lg" aria-hidden="true"></i>
+                                        <span>좋아요! 눈 건강을 지키는 6가지 약속을 확인했어요.</span>
+                                    </div>
+                                )}
+                            </section>
+
+                            {/* STEP 5로 이동 */}
+                            <div className="space-y-2">
+                                <button
+                                    type="button"
+                                    onClick={handleStartQuiz}
+                                    disabled={!isConfirmed}
+                                    aria-describedby="start-hint"
+                                    className={`w-full min-h-[56px] rounded-2xl font-black text-base transition flex items-center justify-center gap-2 ${
+                                        isConfirmed
+                                            ? 'text-white bg-gradient-to-r from-sky-600 to-teal-600 hover:from-sky-700 hover:to-teal-700 shadow-lg shadow-sky-500/25 active:scale-95'
+                                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                    }`}>
+                                    {!isConfirmed && <i className="fa-solid fa-lock" aria-hidden="true"></i>}
+                                    <span>눈 건강 퀴즈 시작하기 →</span>
+                                </button>
+                                <p id="start-hint" className="text-xs text-center text-slate-500 font-semibold">
+                                    {isConfirmed
+                                        ? '인포그래픽 확인 완료! 이제 퀴즈에 참여할 수 있어요.'
+                                        : '인포그래픽 확인을 완료하면 퀴즈 시작 버튼이 열려요.'}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* VIEW 3: QUIZ SCREEN */}
+                    {view === 'quiz' && isConfirmed && (
+                        <div className="space-y-4">
+                            {/* PROGRESS BAR */}
+                            <div className="bg-white/80 backdrop-blur rounded-2xl p-4 card-shadow border border-sky-100 flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                    <span className="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 font-black text-sm flex items-center justify-center">
+                                        Q{currentQIndex + 1}
+                                    </span>
+                                    <div>
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase block">진행 상황</span>
+                                        <span className="text-xs font-extrabold text-slate-800">{currentQIndex + 1} / {QUIZ_QUESTIONS.length} 문항</span>
+                                    </div>
+                                </div>
+
+                                <div className="w-32 bg-slate-100 h-2.5 rounded-full overflow-hidden" role="progressbar"
+                                     aria-valuemin={0} aria-valuemax={QUIZ_QUESTIONS.length} aria-valuenow={currentQIndex + 1} aria-label="퀴즈 진행률">
+                                    <div
+                                        className="bg-gradient-to-r from-sky-500 to-teal-400 h-full transition-all duration-300"
+                                        style={{ width: `${((currentQIndex + 1) / QUIZ_QUESTIONS.length) * 100}%` }}>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* QUESTION CARD */}
+                            <div className="bg-white rounded-3xl p-6 sm:p-7 card-shadow border border-sky-100 space-y-5">
+                                <div className="flex justify-between items-center">
+                                    <span className="px-3 py-1 rounded-full bg-sky-50 text-sky-600 text-xs font-extrabold border border-sky-100">
+                                        {QUIZ_QUESTIONS[currentQIndex].badge}
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-400">
+                                        참가자: <strong className="text-slate-700">{studentId} {studentName}</strong>
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <h2 ref={headingRef} tabIndex={-1} className="text-base sm:text-lg font-black text-slate-900 leading-snug focus:outline-none">
+                                        {QUIZ_QUESTIONS[currentQIndex].title}
+                                    </h2>
+                                    <p className="text-sm font-semibold text-slate-700 leading-relaxed mt-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                        {QUIZ_QUESTIONS[currentQIndex].question}
+                                    </p>
+                                </div>
+
+                                {/* OPTIONS */}
+                                <div className="space-y-2.5 pt-1">
+                                    {QUIZ_QUESTIONS[currentQIndex].options.map((opt, idx) => {
+                                        const isSelected = selectedOption === opt;
+                                        let btnStyle = "bg-slate-50 border-slate-200 text-slate-700 hover:bg-sky-50 hover:border-sky-300";
+
+                                        if (isSelected) {
+                                            btnStyle = "bg-sky-500 text-white border-sky-500 shadow-md shadow-sky-500/20";
+                                        }
+
+                                        if (isSubmitted) {
+                                            if (opt.isCorrect) {
+                                                btnStyle = "bg-emerald-500 text-white border-emerald-500 ring-2 ring-emerald-300";
+                                            } else if (isSelected && !opt.isCorrect) {
+                                                btnStyle = "bg-rose-500 text-white border-rose-500";
+                                            } else {
+                                                btnStyle = "bg-slate-100 border-slate-200 text-slate-400 opacity-60";
+                                            }
+                                        }
+
+                                        return (
+                                            <button
+                                                key={idx}
+                                                disabled={isSubmitted}
+                                                aria-pressed={isSelected}
+                                                onClick={() => handleSelectOption(opt)}
+                                                className={`w-full text-left p-4 rounded-2xl border font-bold text-sm transition-all flex items-center justify-between ${btnStyle}`}>
+                                                <span className="flex items-center space-x-3">
+                                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                                        {idx + 1}
+                                                    </span>
+                                                    <span>{opt.label}</span>
+                                                </span>
+                                                {isSubmitted && opt.isCorrect && (
+                                                    <i className="fa-solid fa-circle-check text-white text-lg" aria-label="정답"></i>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* EXPLANATION & ACTION BUTTON */}
+                                {isSubmitted ? (
+                                    <div className="space-y-4 pt-2 border-t border-slate-100 animate-fadeIn">
+                                        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 space-y-1" aria-live="polite">
+                                            <div className="flex items-center space-x-1.5 font-black text-xs text-amber-700">
+                                                <i className="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                                                <span>해설 및 바로알기</span>
+                                            </div>
+                                            <p className="text-xs sm:text-sm font-medium leading-relaxed">
+                                                {QUIZ_QUESTIONS[currentQIndex].explanation}
+                                            </p>
+                                        </div>
+
+                                        <button
+                                            onClick={handleNextQuestion}
+                                            className="w-full py-4 rounded-2xl font-black text-white bg-slate-900 hover:bg-slate-800 shadow-xl transition transform active:scale-95 flex items-center justify-center space-x-2 text-sm">
+                                            <span>{currentQIndex + 1 < QUIZ_QUESTIONS.length ? '다음 문제 풀기' : '결과 및 상장 확인하기'}</span>
+                                            <i className="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                    {answerError && (
+                                        <p role="alert" className="text-sm font-bold text-rose-600 text-center">{answerError}</p>
+                                    )}
+                                    <button
+                                        onClick={handleSubmitAnswer}
+                                        className="w-full py-4 rounded-2xl font-black text-white bg-gradient-to-r from-sky-500 to-teal-500 hover:from-sky-600 hover:to-teal-600 shadow-lg shadow-sky-500/25 transition transform active:scale-95 flex items-center justify-center space-x-2 text-sm mt-2">
+                                        <i className="fa-solid fa-check-double" aria-hidden="true"></i>
+                                        <span>정답 제출하기</span>
+                                    </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* VIEW 4: RESULT & SNACK PASS TICKET */}
+                    {view === 'result' && quizFinished && participant && (
+                        <div className="space-y-6">
+                            {/* CERTIFICATE / TICKET CONTAINER (PRINTABLE AREA) */}
+                            <div id="snack-pass-card" className="bg-white rounded-3xl p-6 sm:p-8 card-shadow border-2 border-sky-200 space-y-6 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                                {/* BADGE & SCORE */}
+                                <div className="text-center space-y-3">
+                                    <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 font-extrabold text-xs">
+                                        <i className="fa-solid fa-award text-amber-500" aria-hidden="true"></i>
+                                        <span>10월 눈 건강 수료증</span>
+                                    </span>
+                                    <h2 ref={headingRef} tabIndex={-1} className="text-2xl sm:text-3xl font-black text-slate-900 focus:outline-none">
+                                        당신은 <span className="text-sky-600">눈 건강 실천리더!</span>
+                                    </h2>
+                                    <p className="text-xs text-slate-500 font-medium">
+                                        축하합니다! 눈 건강 퀴즈를 성실히 완료하였습니다.
+                                    </p>
+
+                                    <div className="inline-block bg-slate-900 text-white px-6 py-2.5 rounded-2xl font-black text-lg shadow-lg">
+                                        퀴즈 점수: <span className="text-amber-400 font-mono text-2xl ml-1">{score}</span> / 100점
+                                    </div>
+
+                                    <div>
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 font-bold text-xs">
+                                            <i className="fa-solid fa-circle-check" aria-hidden="true"></i>
+                                            <span>눈 건강 인포그래픽 확인 완료</span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* STUDENT INFO TICKET BOX */}
+                                <div className="bg-gradient-to-br from-sky-50 to-teal-50 p-5 rounded-2xl border border-sky-100 space-y-3">
+                                    <div className="flex justify-between items-center text-xs text-slate-500 font-bold pb-2 border-b border-sky-200/60">
+                                        <span>발급 대상자</span>
+                                        <span>보건실 수령 교환권</span>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                        <div>
+                                            <span className="text-xs font-bold text-sky-700 block">학번 {studentId}</span>
+                                            <span className="text-xl font-black text-slate-900">{studentName} 님</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-[10px] text-slate-400 font-bold block">교환 상태</span>
+                                            <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${snackClaimed ? 'bg-emerald-500 text-white' : 'bg-amber-400 text-slate-900'}`}>
+                                                {snackClaimed ? '수령 완료 ✓' : '간식 미수령'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* GUIDANCE FOR SNACK */}
+                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2 text-xs text-slate-600">
+                                    <div className="font-extrabold text-slate-800 flex items-center space-x-1.5">
+                                        <i className="fa-solid fa-gift text-sky-500" aria-hidden="true"></i>
+                                        <span>보건실 간식 수령 안내</span>
+                                    </div>
+                                    <ul className="list-disc list-inside space-y-1 font-medium text-[11px] text-slate-600">
+                                        <li><strong>장소:</strong> 본관 1층 보건실</li>
+                                        <li><strong>시간:</strong> 점심시간 (12:30 ~ 13:20)</li>
+                                        <li>화면 캡처 또는 다운로드한 PDF 교환권을 보건선생님께 보여주세요!</li>
+                                    </ul>
+                                </div>
+
+                                <div className="text-center text-[10px] text-slate-400 font-semibold pt-2 border-t border-slate-100">
+                                    10월 '건강을 길음' 보건행사 | 세계 눈의 날 (10월 8일) 기념
+                                </div>
+                            </div>
+
+                            {/* ACTION BUTTONS */}
+                            <div className="space-y-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        onClick={downloadSnackTicket}
+                                        className="py-3.5 px-4 rounded-xl font-extrabold text-xs bg-sky-600 hover:bg-sky-500 text-white shadow-md transition flex items-center justify-center space-x-1.5">
+                                        <i className="fa-solid fa-download" aria-hidden="true"></i>
+                                        <span>교환권 PDF 저장</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setSnackClaimed(!snackClaimed)}
+                                        className={`py-3.5 px-4 rounded-xl font-extrabold text-xs transition flex items-center justify-center space-x-1.5 ${snackClaimed ? 'bg-slate-200 text-slate-700' : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-md'}`}>
+                                        <i className="fa-solid fa-check" aria-hidden="true"></i>
+                                        <span>{snackClaimed ? '수령 취소' : '수령 완료 체크'}</span>
+                                    </button>
+                                </div>
+
+                                <button
+                                    onClick={() => navigate('infographic')}
+                                    className="w-full py-3.5 rounded-xl font-extrabold text-xs bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 shadow-sm transition flex items-center justify-center space-x-1.5">
+                                    <i className="fa-solid fa-file-image text-sky-500" aria-hidden="true"></i>
+                                    <span>눈 건강 6가지 약속 인포그래픽 다시 보기</span>
+                                </button>
+
+                                <button
+                                    onClick={() => navigate('intro')}
+                                    className="w-full py-3 rounded-xl font-bold text-xs text-slate-500 hover:text-slate-700 transition">
+                                    첫 화면으로 돌아가기
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* VIEW 5: 결과 후 인포그래픽 다시 보기 (원본 이미지) */}
+                    {view === 'infographic' && quizFinished && (
+                        <div className="bg-white rounded-3xl px-3 py-5 sm:p-8 card-shadow border border-sky-100 space-y-5">
+                            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                                <div>
+                                    <span className="text-[10px] font-black text-sky-600 uppercase tracking-wider block">Eye Health Infographic</span>
+                                    <h2 ref={headingRef} tabIndex={-1} className="text-lg font-black text-slate-900 focus:outline-none">눈 건강을 위한 6가지 약속</h2>
+                                </div>
+                                <button
+                                    onClick={() => navigate('result')}
+                                    aria-label="닫고 결과 화면으로 돌아가기"
+                                    className="w-11 h-11 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200">
+                                    <i className="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
+                            </div>
+
+                            {InfographicFigure()}
+
+                            <a
+                                href={INFOGRAPHIC_SRC}
+                                download={INFOGRAPHIC_DOWNLOAD_NAME}
+                                onClick={handleDownload}
+                                role="button"
+                                aria-label={`눈 건강 인포그래픽 PNG 파일 다운로드 (파일명: ${INFOGRAPHIC_DOWNLOAD_NAME})`}
+                                className="w-full min-h-[54px] rounded-2xl font-black text-white bg-sky-700 hover:bg-sky-800 transition flex items-center justify-center gap-2 text-base px-4">
+                                <span aria-hidden="true">📥</span>
+                                <span>눈 건강 인포그래픽 다운로드</span>
+                            </a>
+
+                            <button
+                                onClick={() => navigate('result')}
+                                className="w-full min-h-[48px] rounded-2xl font-black text-sky-700 bg-white border-2 border-sky-200 hover:bg-sky-50 transition text-sm">
+                                결과 화면으로 돌아가기
+                            </button>
+                        </div>
+                    )}
+
+                    </main>
+
+                    {/* FOOTER */}
+                    <footer className="text-center pt-4 text-[11px] text-slate-400 font-semibold">
+                        <p>© 2026 보건실 10월 '건강을 길음' 보건행사</p>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
